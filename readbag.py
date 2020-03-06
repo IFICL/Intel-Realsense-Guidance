@@ -40,9 +40,6 @@ try:
 
     # Start streaming from file
     pipeline.start(config)
-
-    # Create opencv window to render image in
-    cv2.namedWindow("Depth Stream", cv2.WINDOW_AUTOSIZE)
     
     # Create colorizer object
     colorizer = rs.colorizer();
@@ -61,7 +58,10 @@ try:
         # Convert depth_frame to numpy array to render image in opencv
         depth_color_image = np.asanyarray(depth_color_frame.get_data())
         color_image = np.asanyarray(color_frame.get_data())
+        
         images = np.hstack((color_image, depth_color_image))
+        # Create opencv window to render image in
+        cv2.namedWindow("RGB and Depth Stream", cv2.WINDOW_AUTOSIZE)
         # Render image in opencv window
         cv2.imshow("RGB and Depth Stream", images)
         key = cv2.waitKey(1)
