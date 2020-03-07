@@ -6,6 +6,8 @@ import os
 import pickle
 import time
 
+FPS = 15
+
 def save_to_pickle(stream_list, bag_file):
     save_path = bag_file.split('.')[0] + '.pkl'
     pickle_out = open(save_path, "wb")
@@ -13,7 +15,7 @@ def save_to_pickle(stream_list, bag_file):
     pickle_out.close()
 
 def extract_from_bag(bag_file):
-    FPS = 15
+
     config = rs.config()
     pipeline = rs.pipeline()
     config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, FPS)
@@ -37,13 +39,15 @@ def extract_from_bag(bag_file):
     # depth_set = np.zeros([1, 480, 640])
     # color_set = np.zeros([1, 480, 640, 3])
     stream_list = []
-
+    frame_num = -1
     # for i in range(2):
     #     frames = pipeline.wait_for_frames(timeout_ms=100)
     while True:
         try:
             frames = pipeline.wait_for_frames(timeout_ms=100)
             frames.keep()
+            if frame_num == frames.get_frame_number():
+                continue
             timestamp = frames.get_timestamp()
             frame_num = frames.get_frame_number()
             print(frames.get_frame_number())
@@ -51,6 +55,7 @@ def extract_from_bag(bag_file):
             if frames.size() < 2:
                 # Inputs are not ready yet
                 continue
+
         except (RuntimeError):
             print('Total frame count:', count)
             pipeline.stop()
