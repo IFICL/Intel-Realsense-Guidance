@@ -3,6 +3,17 @@ import pyrealsense2 as rs
 import numpy as np
 import cv2
 import os
+import pickle
+
+
+def save_to_pickle(depth_set, color_set, bag_file):
+    save_path = bag_file.split('.')[0] + '.pkl'
+    stream_dict = {}
+    stream_dict['depth'] = depth_set
+    stream_dict['color'] = color_set
+    pickle_out = open(save_path, "wb")
+    pickle.dump(stream_dict, pickle_out)
+    pickle_out.close()
 
 def extract_from_bag(bag_file):
     FPS = 15
@@ -26,6 +37,8 @@ def extract_from_bag(bag_file):
     depth_scale = depth_sensor.get_depth_scale()
 
     count = 0
+    depth_set = np.zeros([1, 480, 640])
+    color_set = np.zeros([1, 480, 640, 3])
     while True:
         try:
             frames = pipeline.wait_for_frames(timeout_ms=100)
@@ -58,7 +71,11 @@ def extract_from_bag(bag_file):
         unaligned_depth_image = np.asanyarray(unaligned_depth_frame.get_data())
         unaligned_depth_colormap = np.asanyarray(rs.colorizer().colorize(unaligned_depth_frame).get_data())
 
-
+        if count != 0:
+            depth_set = np.vstack((depth_set, np.zeros([1, 480, 640])))
+            color_set = np.vstack((color_set, np.zeros([1, 480, 640, 3])))
+        depth_set[count, :, :] = depth_image
+        color_set[count, :, :, :] = color_image
 
         # CV display
         depth_colormap = np.asanyarray(rs.colorizer().colorize(depth_frame).get_data())
@@ -72,7 +89,10 @@ def extract_from_bag(bag_file):
         count += 1
         # import pdb; pdb.set_trace()
     
+
     print("Done!")
+    save_to_pickle(depth_set, color_set, bag_file)
+    print('Saved!')
     cv2.destroyAllWindows()
 
 

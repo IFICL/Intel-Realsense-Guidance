@@ -12,7 +12,7 @@ import rosbag
 if __name__ == "__main__":
     depth = np.array([])
     color = np.array([])
-    filename = 'newtest.bag'
+    filename = 'test.bag'
     bag = rosbag.Bag(filename)
     bagContents = bag.read_messages()
     # print(bag.get_type_and_topic_info())
