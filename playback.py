@@ -4,15 +4,12 @@ import numpy as np
 import cv2
 import os
 import pickle
+import time
 
-
-def save_to_pickle(depth_set, color_set, bag_file):
+def save_to_pickle(stream_list, bag_file):
     save_path = bag_file.split('.')[0] + '.pkl'
-    stream_dict = {}
-    stream_dict['depth'] = depth_set
-    stream_dict['color'] = color_set
     pickle_out = open(save_path, "wb")
-    pickle.dump(stream_dict, pickle_out)
+    pickle.dump(stream_list, pickle_out)
     pickle_out.close()
 
 def extract_from_bag(bag_file):
@@ -29,19 +26,28 @@ def extract_from_bag(bag_file):
     playback = profile.get_device().as_playback()
     playback.set_real_time(False)
 
-    align_to = rs.stream.color
-    align = rs.align(align_to)
 
     # Get data scale from the device
     depth_sensor = profile.get_device().first_depth_sensor()
     depth_scale = depth_sensor.get_depth_scale()
+    align_to = rs.stream.color
+    align = rs.align(align_to)
 
     count = 0
-    depth_set = np.zeros([1, 480, 640])
-    color_set = np.zeros([1, 480, 640, 3])
+    # depth_set = np.zeros([1, 480, 640])
+    # color_set = np.zeros([1, 480, 640, 3])
+    stream_list = []
+
+    # for i in range(2):
+    #     frames = pipeline.wait_for_frames(timeout_ms=100)
     while True:
         try:
             frames = pipeline.wait_for_frames(timeout_ms=100)
+            frames.keep()
+            timestamp = frames.get_timestamp()
+            frame_num = frames.get_frame_number()
+            print(frames.get_frame_number())
+            print(timestamp)
             if frames.size() < 2:
                 # Inputs are not ready yet
                 continue
@@ -50,13 +56,15 @@ def extract_from_bag(bag_file):
             pipeline.stop()
             break
         
+        frame_dict = {}
         # align the deph to color frame
         aligned_frames = align.process(frames)
         # Align depth frame according to color frame
         depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
 
-        
+
+
         # validate that both frames are valid
         if not depth_frame or not color_frame:
             continue
@@ -65,33 +73,46 @@ def extract_from_bag(bag_file):
         # convert to meters
         depth_image = depth_image * depth_scale
         color_image = np.asanyarray(color_frame.get_data())
+        # cv2.imwrite(str(count)+'.png', color_image)
+        # convert color image to BGR for OpenCV
+        # r, g, b = cv2.split(color_image)
+        # color_image = cv2.merge((b, g, r))
 
         # Unaligned depth stream
-        unaligned_depth_frame = frames.get_depth_frame()
-        unaligned_depth_image = np.asanyarray(unaligned_depth_frame.get_data())
-        unaligned_depth_colormap = np.asanyarray(rs.colorizer().colorize(unaligned_depth_frame).get_data())
+        # unaligned_depth_frame = frames.get_depth_frame()
+        # unaligned_depth_image = np.asanyarray(unaligned_depth_frame.get_data())
+        # unaligned_depth_colormap = np.asanyarray(rs.colorizer().colorize(unaligned_depth_frame).get_data())
 
-        if count != 0:
-            depth_set = np.vstack((depth_set, np.zeros([1, 480, 640])))
-            color_set = np.vstack((color_set, np.zeros([1, 480, 640, 3])))
-        depth_set[count, :, :] = depth_image
-        color_set[count, :, :, :] = color_image
+        # if count != 0:
+        #     depth_set = np.vstack((depth_set, np.zeros([1, 480, 640])))
+        #     color_set = np.vstack((color_set, np.zeros([1, 480, 640, 3])))
+        # depth_set[count, :, :] = depth_image
+        # color_set[count, :, :, :] = color_image
 
+        # save info to dict
+        frame_dict['timestamp'] = timestamp
+        frame_dict['frame_number'] = frame_num
+        frame_dict['depth'] = depth_image
+        frame_dict['color'] = color_image
+
+        stream_list.append(frame_dict)
         # CV display
         depth_colormap = np.asanyarray(rs.colorizer().colorize(depth_frame).get_data())
 
         images = np.hstack(
-            (color_image, depth_colormap, unaligned_depth_colormap))
+            (color_image, depth_colormap))
         cv2.namedWindow('RGB and Depth Stream', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('RGB and Depth Stream', images)
+
         if (cv2.waitKey(1) & 0xFF) == ord('q'):
             break
         count += 1
+        # time.sleep(0.1)
         # import pdb; pdb.set_trace()
     
 
     print("Done!")
-    save_to_pickle(depth_set, color_set, bag_file)
+    save_to_pickle(stream_list, bag_file)
     print('Saved!')
     cv2.destroyAllWindows()
 
