@@ -4,8 +4,6 @@ import numpy as np
 import sys
 import os
 from threading import Thread
-import multiprocessing
-import glob
 
 import sounddevice as sd
 import soundfile as sf
@@ -18,9 +16,8 @@ import pdb
 
 parser = argparse.ArgumentParser(description="")
 
-parser.add_argument('--building', type=str, default='str', help='saved folder of .bag and .wav')
-parser.add_argument('--scene_id', type=int, default=0, help='saved folder of .bag and .wav')
-parser.add_argument('--seconds', type=float, default=10.0, help='total recorded seconds')
+parser.add_argument('--filename', type=str, default='str', help='saved folder of .bag and .wav')
+parser.add_argument('--seconds', type=int, default=0, help='total recorded seconds')
 
 
 class soundThread(object): 
@@ -28,21 +25,19 @@ class soundThread(object):
         self.time0 = time0
         self.filename = os.path.join(sample_folder, 'sound.wav')
         self.total_seconds = total_seconds
-        # self.thread = Thread(target=self.record_sound)
-        self.thread = multiprocessing.Process(target=self.record_sound)
-
+        self.thread = Thread(target=self.record_sound)
         self.thread.start()
         self.end_sound = None
-        
 
     def record_sound(self): 
         fs = 48000
+        # sd.default.device = [1, 3]
         print('Start time of soound thread: ', time.time() - self.time0)
         myrecording = sd.rec(int(self.total_seconds * fs), samplerate=fs, channels=2, dtype='int16')
         sd.wait()
         write(self.filename, fs, myrecording)
         end_sound = time.time() - self.time0
-        print('End time of sound thread: ', end_sound)
+        print('End time of soound thread: ', end_sound)
         if self.end_sound == None: 
             self.end_sound = end_sound
 
@@ -53,15 +48,14 @@ class videoThread(object):
         self.filename = os.path.join(sample_folder, 'video.bag')
         self.total_seconds = total_seconds
         self.images = None
-        self.thread = multiprocessing.Process(target=self.record_video)
-        # self.thread = Thread(target=self.record_video)
+        self.thread = Thread(target=self.record_video)
         self.thread.start()
         self.end_video = None
-
+        
     def record_video(self):
         pipeline = rs.pipeline()
         config = rs.config()
-        fps = 6
+        fps = 15
         config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, fps)
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, fps)
         config.enable_record_to_file(self.filename)
@@ -80,11 +74,7 @@ class videoThread(object):
                 if not depth_frame or not color_frame:
                     pdb.set_trace()
                     continue
-                depth_image = np.asanyarray(depth_frame.get_data())
-                depth_image = depth_image * depth_scale
-                # pdb.set_trace()
-                depth = np.mean(depth_image[int(480/4):int(480-480/4), int(848/4):int(848-848/4)])
-                print('current distance:', depth)
+               
                 count += 1
                 e2 = cv2.getTickCount()
                 t = (e2 - e1) / cv2.getTickFrequency()
@@ -108,27 +98,16 @@ class videoThread(object):
             cv2.waitKey(1)
 
 
-def main():
+# Example: 
+# python record_video_audio.py --filename=test --seconds=5
+
+if __name__ == "__main__":
     args = parser.parse_args()
-    # set default device for recording
-    sd.default.device = [7, 4]
-    print(sd.query_devices())
-
     # create folder
-    parent_folder = 'NewAudio3D-Dataset'
-    scene_folder = os.path.join(parent_folder, args.building, 'scene-' + str(args.scene_id).zfill(3)) 
-    os.makedirs(scene_folder, exist_ok=True)
-
-    # check number of clip exists
-    clip_list = glob.glob(f"{scene_folder}/*")
-    clip_list.sort()
-    print(f"Number of clips in {scene_folder}: {len(clip_list)}")
-
-
-    sample_folder = os.path.join(secen_folder, 'clip'+str(len(clip_list)).zfill(3))
-    os.makedirs(sample_folder, exist_ok=True)
-    print(f"Start recording {sample_folder}")
-
+    sample_folder = os.path.join('./samples', args.filename)
+    if not os.path.exists(sample_folder): 
+        os.mkdir(sample_folder)
+    
     t0 = time.time()
     video = videoThread(t0, args.seconds, sample_folder)
     sound = soundThread(t0, args.seconds, sample_folder)
@@ -147,14 +126,3 @@ def main():
     end_video = video.end_video
     print('Time difference: ', end_sound - end_video)
     np.save(os.path.join(sample_folder, "td.npy"), np.asarray(end_sound - end_video))
-
-
-
-# To see current sound devices: 
-# python -m sounddevice
-
-# Example: 
-# python record_video_audio.py --building='home' --scene_id=0 --seconds=10
-
-if __name__ == "__main__":
-    main()
