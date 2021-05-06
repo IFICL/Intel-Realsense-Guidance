@@ -11,8 +11,7 @@ import sounddevice as sd
 import soundfile as sf
 import pyrealsense2 as rs
 import cv2
-from scipy.io.wavfile import write
-
+import json
 import pdb
 
 
@@ -28,20 +27,21 @@ class soundThread(object):
         self.time0 = time0
         self.filename = os.path.join(sample_folder, 'sound.wav')
         self.total_seconds = total_seconds
-        # self.thread = Thread(target=self.record_sound)
-        self.thread = multiprocessing.Process(target=self.record_sound)
-
+        self.thread = Thread(target=self.record_sound)
+        # self.thread = multiprocessing.Process(target=self.record_sound)
+        self.fs = 48000
         self.thread.start()
         self.end_sound = None
         
 
     def record_sound(self): 
-        fs = 48000
-        print('Start time of soound thread: ', time.time() - self.time0)
-        myrecording = sd.rec(int(self.total_seconds * fs), samplerate=fs, channels=2, dtype='int16')
+        print('Start time of sound thread: ', time.time() - self.time0)
+        myrecording = sd.rec(int(self.total_seconds * self.fs), samplerate=self.fs, channels=2, dtype='float64')
         sd.wait()
-        write(self.filename, fs, myrecording)
         end_sound = time.time() - self.time0
+        sf.write(self.filename, myrecording, self.fs)
+        # write(self.filename, fs, myrecording)
+        
         print('End time of sound thread: ', end_sound)
         if self.end_sound == None: 
             self.end_sound = end_sound
@@ -53,20 +53,25 @@ class videoThread(object):
         self.filename = os.path.join(sample_folder, 'video.bag')
         self.total_seconds = total_seconds
         self.images = None
-        self.thread = multiprocessing.Process(target=self.record_video)
-        # self.thread = Thread(target=self.record_video)
+        # self.thread = multiprocessing.Process(target=self.record_video)
+        self.thread = Thread(target=self.record_video)
         self.thread.start()
         self.end_video = None
+        self.fps = 6
+        self.depth = None
 
     def record_video(self):
         pipeline = rs.pipeline()
         config = rs.config()
-        fps = 6
-        config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, fps)
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, fps)
+        
+        config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, self.fps)
+        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, self.fps)
         config.enable_record_to_file(self.filename)
         # Start streaming sazxaas
-        pipeline.start(config)
+        profile = pipeline.start(config)
+        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_scale = depth_sensor.get_depth_scale()
+
         e1 = cv2.getTickCount()
         print('Start time of video thread: ', time.time() - self.time0)
         count = 0
@@ -84,12 +89,13 @@ class videoThread(object):
                 depth_image = depth_image * depth_scale
                 # pdb.set_trace()
                 depth = np.mean(depth_image[int(480/4):int(480-480/4), int(848/4):int(848-848/4)])
-                print('current distance:', depth)
+                print(f'current distance: {depth}', end="\r")
                 count += 1
                 e2 = cv2.getTickCount()
                 t = (e2 - e1) / cv2.getTickFrequency()
                 if t >= self.total_seconds:  # change it to record what length of video you are interested in
                     end_video = time.time() - self.time0
+                    print("\n")
                     print('End time of video thread: ', end_video)
                     print('Total frames: ', count)
                     break
@@ -100,6 +106,8 @@ class videoThread(object):
         
         if self.end_video == None: 
             self.end_video = end_video
+        if self.depth == None:
+            self.depth = depth
         
     def show(self): 
         if self.images is not None: 
@@ -122,10 +130,9 @@ def main():
     # check number of clip exists
     clip_list = glob.glob(f"{scene_folder}/*")
     clip_list.sort()
-    print(f"Number of clips in {scene_folder}: {len(clip_list)}")
-
-
-    sample_folder = os.path.join(secen_folder, 'clip'+str(len(clip_list)).zfill(3))
+    clip_id = len(clip_list)
+    print(f"Number of clips in {scene_folder}: {clip_id}")
+    sample_folder = os.path.join(scene_folder, 'clip-'+str(clip_id).zfill(3))
     os.makedirs(sample_folder, exist_ok=True)
     print(f"Start recording {sample_folder}")
 
@@ -145,8 +152,21 @@ def main():
     sound.thread.join()
     end_sound = sound.end_sound
     end_video = video.end_video
-    print('Time difference: ', end_sound - end_video)
-    np.save(os.path.join(sample_folder, "td.npy"), np.asarray(end_sound - end_video))
+    time_diff = float(end_sound - end_video)
+    print('Time difference: ', time_diff)
+    info_dict = {
+        'Audio Sample Rate': sound.fs,
+        'Audio Length': args.seconds,
+        'Video FPS': video.fps,
+        'Time Difference(sound - video)': time_diff,
+        'Building': args.building,
+        'Scene id': args.scene_id,
+        'Clip id': clip_id,
+        'depth': video.depth
+    }
+    json_path = os.path.join(sample_folder, 'meta.json')
+    with open(json_path, 'w') as fp:
+        json.dump(info_dict, fp, sort_keys=False, indent=4)
 
 
 
