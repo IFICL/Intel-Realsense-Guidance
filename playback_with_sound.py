@@ -7,7 +7,7 @@ import pickle
 import time
 from scipy.io import wavfile
 import subprocess
-
+import json
 import pdb
 
 
@@ -16,15 +16,6 @@ parser = argparse.ArgumentParser(description="")
 parser.add_argument("-i", "--input", type=str,
                     help="Path to the folder saving bag and wav file", required=True)
 
-
-def save_to_pickle(depth_set, color_set, name):
-    save_path = name + '.pkl'
-    stream_dict = {}
-    stream_dict['depth'] = depth_set
-    stream_dict['color'] = color_set
-    pickle_out = open(save_path, "wb")
-    pickle.dump(stream_dict, pickle_out)
-    pickle_out.close()
 
 
 def extract_from_bag(bag_file, FPS=15):
@@ -63,7 +54,7 @@ def extract_from_bag(bag_file, FPS=15):
                 continue
             frame_num = frames.get_frame_number()
             
-            print(frame_num)
+            # print(frame_num)
             if count == 0: 
                 time_stamps.append(0)
                 start_time = frames.get_timestamp()
@@ -105,56 +96,40 @@ def extract_from_bag(bag_file, FPS=15):
 def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_diff, fps=15): 
     depth_color_sync = os.path.join(folder, 'dep_color_sync.mp4')
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-    frame_start_time = 1/fps * frame_index[0]
+    frame_start_time = 1 / fps * frame_index[0]
     out = cv2.VideoWriter(depth_color_sync, fourcc, fps, (color_set[0].shape[1],color_set[0].shape[0]))
-    if frame_start_time > time_diff:     
-        for i in range(len(time_stamps)): 
-            images = color_set[i]
-            out.write(images)
-        cv2.destroyAllWindows()
-        out.release()
+    # if frame_start_time > time_diff:     
+    for i in range(len(time_stamps)): 
+        images = color_set[i]
+        out.write(images)
+    cv2.destroyAllWindows()
+    out.release()
 
-        rate, data = wavfile.read(wav_file) 
-        # pdb.set_trace()
-        clipped_wav_out = os.path.join(folder, 'sound_clipped.wav')
-        wavfile.write(clipped_wav_out, rate, data[int((1/fps *frame_index[0] - time_diff) * rate):, :])
-        # pdb.set_trace()
-        # mixed_path = os.path.join(folder, 'mixed.mp4')
-        # subprocess.run(['ffmpeg', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
+    rate, data = wavfile.read(wav_file) 
+    clipped_wav_out = os.path.join(folder, 'sound_clipped.wav')
+    wavfile.write(clipped_wav_out, rate, data[int((time_diff + frame_start_time) * rate):, :])
 
-    else: 
-        start_frame_index = int((time_diff - frame_start_time) * 15)
-        for i in range(start_frame_index, len(time_stamps)): 
-            images = color_set[i]
-            out.write(images)
-        cv2.destroyAllWindows()
-        out.release()
-
-        rate, data = wavfile.read(wav_file) 
-        # pdb.set_trace()
-        clipped_wav_out = os.path.join(folder, 'sound_clipped.wav')
-        wavfile.write(clipped_wav_out, rate, data)
-        # pdb.set_trace()
     mixed_path = os.path.join(folder, 'mixed.mp4')
     subprocess.run(['ffmpeg', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
 
 
-if __name__ == "__main__":
-
-    # Parse the command line arguments to an object
+def main():
     args = parser.parse_args()
-
     # create folder
     sync_folder = os.path.join('./sync', args.input)
-    if not os.path.exists(sync_folder): 
-        os.mkdir(sync_folder)
+    os.makedirs(sync_folder, exist_ok=True)
+    
+    bag = os.path.join(args.input, 'video.bag')
+    wav = os.path.join(args.input, 'sound.wav')
+    meta = os.path.join(args.input, 'meta.json')
+    with open(meta, 'r') as fp:
+        meta_data = json.load(fp)
+    time_diff = meta_data['Time Difference(sound - video)']
 
-    bag = os.path.join('samples', args.input, 'video.bag')
-    wav = os.path.join('samples', args.input, 'sound.wav')
-    time_diff = np.load(os.path.join('samples', args.input, 'td.npy'))
+    depth_set, color_set, frame_index, time_stamps = extract_from_bag(bag, FPS=meta_data['Video FPS'])
 
-    depth_set, color_set, frame_index, time_stamps = extract_from_bag(bag)
+    generate_sync(sync_folder, color_set, time_stamps, frame_index, wav, time_diff, fps=meta_data['Video FPS'])
 
-    generate_sync(sync_folder, color_set, time_stamps, frame_index, wav, time_diff)
 
-# ffmpeg -i synchronize.mp4 -i out_clipped.wav -shortest mixed.mp4
+if __name__ == "__main__":
+    main()

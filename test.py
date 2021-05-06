@@ -15,20 +15,23 @@ import cv2
 import pdb
 import geocoder
 
-# def main():
-#     pdb.set_trace()
-#     sd.default.device = [7, 4]
-#     print(sd.query_devices())
-#     filename = 'test.wav'
-#     fs = 48000
-#     myrecording = sd.rec(int(10 * fs), samplerate=fs, channels=2, dtype='float64')
-#     sd.wait()
-#     sf.write(filename, myrecording, fs)
-
 def main():
-    g = geocoder.ip('me')
-    pdb.set_trace()
-    print(g.latlng)
+    # pdb.set_trace()
+    sd.default.device = [0, 4]
+    print(sd.query_devices())
+    filename = 'test.wav'
+    fs = 48000
+    start = time.time()
+    print(start - start)
+    myrecording = sd.rec(int(10 * fs), samplerate=fs, channels=2, dtype='float64')
+    sd.wait()
+    print(time.time() - start)
+    sf.write(filename, myrecording, fs)
+
+# def main():
+#     g = geocoder.ip('me')
+#     pdb.set_trace()
+#     print(g.latlng)
 
 if __name__ == '__main__':
     main()

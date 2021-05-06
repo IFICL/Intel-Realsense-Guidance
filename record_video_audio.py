@@ -30,21 +30,23 @@ class soundThread(object):
         self.thread = Thread(target=self.record_sound)
         # self.thread = multiprocessing.Process(target=self.record_sound)
         self.fs = 48000
+        self.start_time = None
+        self.end_time = None
         self.thread.start()
-        self.end_sound = None
         
-
+        
     def record_sound(self): 
-        print('Start time of sound thread: ', time.time() - self.time0)
+        self.start_time = time.time() - self.time0
+        print('Start time of sound thread: ', self.start_time)
         myrecording = sd.rec(int(self.total_seconds * self.fs), samplerate=self.fs, channels=2, dtype='float64')
         sd.wait()
-        end_sound = time.time() - self.time0
+        end_time = time.time() - self.time0
         sf.write(self.filename, myrecording, self.fs)
         # write(self.filename, fs, myrecording)
         
-        print('End time of sound thread: ', end_sound)
-        if self.end_sound == None: 
-            self.end_sound = end_sound
+        print('End time of sound thread: ', end_time)
+        if self.end_time == None: 
+            self.end_time = end_time
 
 
 class videoThread(object): 
@@ -53,12 +55,14 @@ class videoThread(object):
         self.filename = os.path.join(sample_folder, 'video.bag')
         self.total_seconds = total_seconds
         self.images = None
+        self.start_time = None
+        self.end_time = None
+        self.fps = 15
+        self.depth = None
         # self.thread = multiprocessing.Process(target=self.record_video)
         self.thread = Thread(target=self.record_video)
         self.thread.start()
-        self.end_video = None
-        self.fps = 6
-        self.depth = None
+        
 
     def record_video(self):
         pipeline = rs.pipeline()
@@ -73,7 +77,8 @@ class videoThread(object):
         depth_scale = depth_sensor.get_depth_scale()
 
         e1 = cv2.getTickCount()
-        print('Start time of video thread: ', time.time() - self.time0)
+        self.start_time = time.time() - self.time0
+        print('Start time of video thread: ', self.start_time)
         count = 0
         try:
             while(True):
@@ -94,9 +99,9 @@ class videoThread(object):
                 e2 = cv2.getTickCount()
                 t = (e2 - e1) / cv2.getTickFrequency()
                 if t >= self.total_seconds:  # change it to record what length of video you are interested in
-                    end_video = time.time() - self.time0
+                    end_time = time.time() - self.time0
                     print("\n")
-                    print('End time of video thread: ', end_video)
+                    print('End time of video thread: ', end_time)
                     print('Total frames: ', count)
                     break
 
@@ -104,8 +109,8 @@ class videoThread(object):
             # Stop streaming
             pipeline.stop()
         
-        if self.end_video == None: 
-            self.end_video = end_video
+        if self.end_time == None: 
+            self.end_time = end_time
         if self.depth == None:
             self.depth = depth
         
@@ -119,7 +124,7 @@ class videoThread(object):
 def main():
     args = parser.parse_args()
     # set default device for recording
-    sd.default.device = [7, 4]
+    sd.default.device = [0, 4]
     print(sd.query_devices())
 
     # create folder
@@ -150,9 +155,7 @@ def main():
     # compute time difference
     video.thread.join()
     sound.thread.join()
-    end_sound = sound.end_sound
-    end_video = video.end_video
-    time_diff = float(end_sound - end_video)
+    time_diff = float(video.start_time - sound.start_time)
     print('Time difference: ', time_diff)
     info_dict = {
         'Audio Sample Rate': sound.fs,
