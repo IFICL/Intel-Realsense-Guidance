@@ -34,7 +34,7 @@ class soundThread(object):
         self.start_time = None
         self.end_time = None
         self.thread = Thread(target=self.record_sound)
-        self.thread.start()
+        # self.thread.start()
         
         
     def record_sound(self): 
@@ -58,37 +58,29 @@ class videoThread(object):
         self.filename = os.path.join(sample_folder, 'video.bag')
         self.fps = 6
         self.total_seconds = total_seconds
+        self.pipeline, self.profile = self.init_depth_camera()
         self.images = None
         self.start_time = None
         self.end_time = None
         self.depth = None
         # self.thread = multiprocessing.Process(target=self.record_video)
         self.thread = Thread(target=self.record_video)
-        self.thread.start()
+        # self.thread.start()
         
 
     def record_video(self):
-        pipeline = rs.pipeline()
-        config = rs.config()
-        
-        config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, self.fps)
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, self.fps)
-        config.enable_record_to_file(self.filename)
-        # Start streaming sazxaas
-        profile = pipeline.start(config)
-        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_sensor = self.profile.get_device().first_depth_sensor()
         depth_scale = depth_sensor.get_depth_scale()
-        rgb_sensor = profile.get_device().query_sensors()[1]
-        rgb_sensor.set_option(rs.option.enable_auto_exposure, True)
         
         e1 = cv2.getTickCount()
         count = 0
         self.start_time = time.time() - self.time0
         print('Start time of video thread: ', self.start_time)
         try:
+            rs.recorder.resume(self.profile.get_device().as_recorder())
             while(True):
                 # Wait for a coherent pair of frames: depth and color
-                frames = pipeline.wait_for_frames()
+                frames = self.pipeline.wait_for_frames()
                 frames.keep()
                 depth_frame = frames.get_depth_frame()
                 color_frame = frames.get_color_frame()
@@ -113,7 +105,7 @@ class videoThread(object):
                     break
         finally:
             # Stop streaming
-            pipeline.stop()
+            self.pipeline.stop()
     
         
     def show(self): 
@@ -131,6 +123,9 @@ class videoThread(object):
         config.enable_record_to_file(self.filename)
         # Start streaming sazxaas
         profile = pipeline.start(config)
+        rgb_sensor = profile.get_device().query_sensors()[1]
+        rgb_sensor.set_option(rs.option.enable_auto_exposure, True)
+        rs.recorder.pause(profile.get_device().as_recorder())
         return pipeline, profile
 
 
@@ -161,7 +156,7 @@ def main():
     t0 = time.time()
     video = videoThread(t0, args.seconds, sample_folder)
     sound = soundThread(t0, args.seconds, sample_folder)
-
+    time.sleep(5)
     ## visualization of video, cannot record together with sound
     # while video.thread.is_alive(): 
     #     try: 
@@ -170,6 +165,8 @@ def main():
     #         pass   
     
     # compute time difference
+    video.thread.start()
+    sound.thread.start()
     video.thread.join()
     sound.thread.join()
     time_diff = float(video.start_time - sound.start_time)

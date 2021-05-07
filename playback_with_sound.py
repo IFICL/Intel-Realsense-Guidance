@@ -90,7 +90,9 @@ def extract_from_bag(bag_file, FPS):
         count += 1
 
     print("Video processing done!")
-    return depth_set, color_set, np.asarray(frame_index), np.asarray(time_stamps)/1000
+    frame_index = np.asarray(frame_index) - frame_index[0]
+    time_stamps = np.asarray(time_stamps) / 1000
+    return depth_set, color_set, frame_index, time_stamps 
 
 
 def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_diff, fps): 
@@ -119,7 +121,7 @@ def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_di
     wavfile.write(clipped_wav_out, rate, data[int(audio_start_point * rate):, :])
 
     mixed_path = os.path.join(folder, 'mixed.mp4')
-    subprocess.run(['ffmpeg', '-y', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
+    subprocess.run(['ffmpeg', '-v', 'quiet', '-y', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
 
 
 def main():
