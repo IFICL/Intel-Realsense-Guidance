@@ -18,7 +18,7 @@ parser.add_argument("-i", "--input", type=str,
 
 
 
-def extract_from_bag(bag_file, FPS=15):
+def extract_from_bag(bag_file, FPS):
     config = rs.config()
     pipeline = rs.pipeline()
     config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, FPS)
@@ -93,13 +93,22 @@ def extract_from_bag(bag_file, FPS=15):
     return depth_set, color_set, np.asarray(frame_index), np.asarray(time_stamps)/1000
 
 
-def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_diff, fps=15): 
+def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_diff, fps): 
+    # import pdb; pdb.set_trace()
     depth_color_sync = os.path.join(folder, 'dep_color_sync.mp4')
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
     frame_start_time = 1 / fps * frame_index[0]
+    total_time_diff = time_diff + frame_start_time
+    if total_time_diff >= 0:
+        audio_start_point = total_time_diff
+    else:
+        audio_start_point = 0.0
+        frame_start = int(fps * np.abs(total_time_diff))
+        color_set = color_set[frame_start:]
+
     out = cv2.VideoWriter(depth_color_sync, fourcc, fps, (color_set[0].shape[1],color_set[0].shape[0]))
     # if frame_start_time > time_diff:     
-    for i in range(len(time_stamps)): 
+    for i in range(len(color_set)): 
         images = color_set[i]
         out.write(images)
     cv2.destroyAllWindows()
@@ -107,10 +116,10 @@ def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_di
 
     rate, data = wavfile.read(wav_file) 
     clipped_wav_out = os.path.join(folder, 'sound_clipped.wav')
-    wavfile.write(clipped_wav_out, rate, data[int((time_diff + frame_start_time) * rate):, :])
+    wavfile.write(clipped_wav_out, rate, data[int(audio_start_point * rate):, :])
 
     mixed_path = os.path.join(folder, 'mixed.mp4')
-    subprocess.run(['ffmpeg', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
+    subprocess.run(['ffmpeg', '-y', '-i', depth_color_sync, '-i', clipped_wav_out, '-shortest', mixed_path])
 
 
 def main():
@@ -124,7 +133,7 @@ def main():
     meta = os.path.join(args.input, 'meta.json')
     with open(meta, 'r') as fp:
         meta_data = json.load(fp)
-    time_diff = meta_data['Time Difference(sound - video)']
+    time_diff = meta_data['Time Difference(video - sound)']
 
     depth_set, color_set, frame_index, time_stamps = extract_from_bag(bag, FPS=meta_data['Video FPS'])
 
