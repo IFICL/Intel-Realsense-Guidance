@@ -46,10 +46,11 @@ class soundThread(object):
         end_time = time.time() - self.time0
         sf.write(self.filename, myrecording, self.fs)
         # write(self.filename, fs, myrecording)
-        
         print('End time of sound thread: ', end_time)
         if self.end_time == None: 
             self.end_time = end_time
+        amp = np.abs(myrecording).mean()
+        print(f'Recording Amp: {amp}')
 
 
 class videoThread(object): 
@@ -137,7 +138,7 @@ def main():
     print(sd.query_devices())
 
     # create folder
-    parent_folder = 'NewAudio3D-Dataset'
+    parent_folder = 'NewAudio3D-Dataset/RawData'
     scene_folder = os.path.join(parent_folder, args.building, 'scene-' + str(args.scene_id).zfill(3)) 
     os.makedirs(scene_folder, exist_ok=True)
 
@@ -156,13 +157,7 @@ def main():
     t0 = time.time()
     video = videoThread(t0, args.seconds, sample_folder)
     sound = soundThread(t0, args.seconds, sample_folder)
-    time.sleep(5)
-    ## visualization of video, cannot record together with sound
-    # while video.thread.is_alive(): 
-    #     try: 
-    #         video.show()
-    #     except AttributeError: 
-    #         pass   
+    time.sleep(5) 
     
     # compute time difference
     video.thread.start()
