@@ -108,6 +108,7 @@ def generate_sync(folder, color_set, time_stamps, frame_index, wav_file, time_di
         frame_start = int(fps * np.abs(total_time_diff))
         color_set = color_set[frame_start:]
 
+    # import pdb; pdb.set_trace()
     out = cv2.VideoWriter(depth_color_sync, fourcc, fps, (color_set[0].shape[1],color_set[0].shape[0]))
     # if frame_start_time > time_diff:     
     for i in range(len(color_set)): 

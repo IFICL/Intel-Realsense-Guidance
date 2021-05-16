@@ -20,15 +20,16 @@ parser = argparse.ArgumentParser(description="")
 parser.add_argument('--building', type=str, default='str', help='saved folder of .bag and .wav')
 parser.add_argument('--scene_id', type=int, default=0, help='saved folder of .bag and .wav')
 parser.add_argument('--seconds', type=float, default=10.0, help='total recorded seconds')
-parser.add_argument('--overwrite_previous', default=False, action='store_true', help='whether overwrite previous one')
+parser.add_argument('--FPS', type=int, default=6, help='frame rate setup')
+parser.add_argument('--overwrite', default=False, action='store_true', help='whether overwrite previous one')
 
 
 
 class soundThread(object): 
-    def __init__(self, time0, total_seconds, sample_folder): 
+    def __init__(self, time0, sample_folder, args): 
         self.time0 = time0
         self.filename = os.path.join(sample_folder, 'sound.wav')
-        self.total_seconds = total_seconds
+        self.total_seconds = args.seconds
         # self.thread = multiprocessing.Process(target=self.record_sound)
         self.fs = 48000
         self.start_time = None
@@ -54,11 +55,11 @@ class soundThread(object):
 
 
 class videoThread(object): 
-    def __init__(self, time0, total_seconds, sample_folder): 
+    def __init__(self, time0, sample_folder, args): 
         self.time0 = time0
         self.filename = os.path.join(sample_folder, 'video.bag')
-        self.fps = 6
-        self.total_seconds = total_seconds
+        self.fps = args.FPS
+        self.total_seconds = args.seconds
         self.pipeline, self.profile = self.init_depth_camera()
         self.images = None
         self.start_time = None
@@ -146,7 +147,7 @@ def main():
     clip_list = glob.glob(f"{scene_folder}/*")
     clip_list.sort()
     clip_id = len(clip_list)
-    if args.overwrite_previous and clip_id > 0:
+    if args.overwrite and clip_id > 0:
         clip_id -= 1
         
     print(f"Number of clips in {scene_folder}: {clip_id}")
@@ -155,8 +156,8 @@ def main():
     print(f"Start recording {sample_folder}")
 
     t0 = time.time()
-    video = videoThread(t0, args.seconds, sample_folder)
-    sound = soundThread(t0, args.seconds, sample_folder)
+    video = videoThread(t0, sample_folder, args)
+    sound = soundThread(t0, sample_folder, args)
     time.sleep(5) 
     
     # compute time difference
