@@ -18,7 +18,7 @@ import pdb
 parser = argparse.ArgumentParser(description="")
 
 parser.add_argument('--building', type=str, default='str', help='saved folder of .bag and .wav')
-parser.add_argument('--scene_id', type=int, default=0, help='saved folder of .bag and .wav')
+# parser.add_argument('--scene_id', type=int, default=0, help='saved folder of .bag and .wav')
 parser.add_argument('--seconds', type=float, default=20.0, help='total recorded seconds')
 parser.add_argument('--FPS', type=int, default=15, help='frame rate setup')
 parser.add_argument('--overwrite', default=False, action='store_true', help='whether overwrite previous one')
@@ -161,6 +161,7 @@ def main():
     video = videoThread(t0, sample_folder, args)
     sound = soundThread(t0, sample_folder, args)
     time.sleep(5) 
+    print('\a')
     
     # compute time difference
     video.thread.start()
@@ -175,13 +176,13 @@ def main():
         'Video FPS': video.fps,
         'Time Difference(video - sound)': time_diff,
         'Building': args.building,
-        'Scene id': clip_id,
-        'depth': video.depth
+        'Scene id': clip_id
     }
     json_path = os.path.join(sample_folder, 'meta.json')
     with open(json_path, 'w') as fp:
         json.dump(info_dict, fp, sort_keys=False, indent=4)
     print(info_dict)
+    print('\a')
 
 
 
