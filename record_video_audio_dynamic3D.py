@@ -160,9 +160,10 @@ def main():
     t0 = time.time()
     video = videoThread(t0, sample_folder, args)
     sound = soundThread(t0, sample_folder, args)
-    time.sleep(5) 
+    time.sleep(4) 
     print('\a')
-    
+    time.sleep(1) 
+
     # compute time difference
     video.thread.start()
     sound.thread.start()
